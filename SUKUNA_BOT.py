@@ -1,4 +1,4 @@
-Import telebot
+import telebot
 from telebot import types
 
 # --- الإعدادات الأساسية ---
@@ -69,3 +69,11 @@ def handle_text(message):
         bot.send_message(message.chat.id, msg2)
 
 bot.infinity_polling()
+
+
+
+
+
+
+
+
