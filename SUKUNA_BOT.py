@@ -1,41 +1,41 @@
 import os
 import telebot
-import insightface
-from insightface.app import FaceAnalysis
 import cv2
 import numpy as np
+import insightface
+from insightface.app import FaceAnalysis
 from flask import Flask
 from threading import Thread
 
-# --- 1. تشغيل سيرفر ويب لإرضاء Render ومنع التوقف ---
+# 1. خادم ويب بسيط جداً لضمان عمل Render
 app = Flask(__name__)
 @app.route('/')
-def home(): return "SUKUNA IS LIVE"
+def home(): return "SUKUNA IS ALIVE"
 
 def run():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
-# تشغيل السيرفر في الخلفية فوراً
 Thread(target=run, daemon=True).start()
 
-# --- 2. تحميل الموديل تلقائياً ---
-if not os.path.exists('inswapper_128.onnx'):
-    os.system("wget https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx -O inswapper_128.onnx")
-
-# --- 3. إعدادات البوت والذكاء الاصطناعي ---
+# 2. إعداد البوت
 TOKEN = '8382035555:AAEyKqioQySc5HNLSJ3Nw6rDh89p3RpRDPY'
 bot = telebot.TeleBot(TOKEN)
 target_face = None
 
-# إعداد المحرك للعمل على الـ CPU (متوافق مع خطة Render المجانية)
+# 3. تحميل نموذج خفيف جداً (لتجنب نفاد الذاكرة Out of Memory)
+# قمنا بتصغير حجم det_size لتقليل استهلاك الرام
 face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
-face_app.prepare(ctx_id=0, det_size=(640, 640))
+face_app.prepare(ctx_id=0, det_size=(320, 320)) 
+
+# تحميل موديل التبديل
+if not os.path.exists('inswapper_128.onnx'):
+    os.system("wget https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx -O inswapper_128.onnx")
 swapper = insightface.model_zoo.get_model('inswapper_128.onnx', download=False)
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, "✅ نظام SUKUNA شغال الآن!\nأرسل صورة الوجه (Target) أولاً.")
+def start(message):
+    bot.reply_to(message, "✅ سكونا يعمل الآن بنجاح!\nأرسل صورة الوجه أولاً.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -49,18 +49,17 @@ def handle_photo(message):
         if not target_face:
             if faces:
                 target_face = faces[0]
-                bot.reply_to(message, "👤 تم حفظ الوجه الهدف بنجاح. أرسل الآن الصورة التي تريد تبديل الوجه فيها.")
+                bot.reply_to(message, "👤 تم حفظ الوجه. أرسل الصورة المراد تعديلها.")
             else:
-                bot.reply_to(message, "❌ لم أجد وجهاً في الصورة، حاول مرة أخرى.")
+                bot.reply_to(message, "لم أجد وجهاً.")
         else:
             res = img.copy()
             for face in faces:
                 res = swapper.get(res, face, target_face, paste_back=True)
             _, enc = cv2.imencode('.jpg', res)
-            bot.send_photo(message.chat.id, enc.tobytes(), caption="🔥 تم التنفيذ بواسطة SUKUNA")
+            bot.send_photo(message.chat.id, enc.tobytes(), caption="🔥 تم بواسطة سكونا")
     except Exception as e:
-        bot.reply_to(message, f"⚠️ حدث خطأ: {e}")
+        bot.reply_to(message, f"خطأ بسيط: {e}")
 
 if __name__ == "__main__":
-    print("البوت بدأ العمل...")
     bot.polling(none_stop=True)
