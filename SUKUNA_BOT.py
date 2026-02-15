@@ -4,12 +4,12 @@ import insightface
 from insightface.app import FaceAnalysis
 import cv2
 import numpy as np
-# تصحيح الاستدعاء هنا (حذفنا .editor ليتوافق مع النسخة الجديدة)
+# التعديل المهم: حذفنا .editor ليتوافق مع النسخة الجديدة من المكتبة
 from moviepy import VideoFileClip, AudioFileClip, ImageSequenceClip
 from flask import Flask
 from threading import Thread
 
-# --- 1. خادم ويب صغير (لإرضاء منصة Render ومنع التوقف) ---
+# --- 1. خادم ويب صغير لضمان استقرار الخدمة على Render ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -17,7 +17,7 @@ def home():
     return "SUKUNA BOT IS ONLINE"
 
 def run_server():
-    # Render يفرض فتح منفذ (Port) وإلا سيغلق البوت
+    # Render يحتاج لفتح منفذ PORT ليعتبر الخدمة ناجحة
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -26,9 +26,9 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- 2. تحميل موديل التبديل تلقائياً إذا لم يكن موجوداً ---
+# --- 2. تحميل موديل التبديل تلقائياً في السيرفر ---
 if not os.path.exists('inswapper_128.onnx'):
-    print("جاري تحميل الموديل الثقيل... انتظر قليلاً")
+    print("جاري تحميل الموديل... قد يستغرق ذلك وقتاً")
     os.system("wget https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx -O inswapper_128.onnx")
 
 # --- 3. إعدادات البوت والذكاء الاصطناعي ---
@@ -36,19 +36,19 @@ TOKEN = '8382035555:AAEyKqioQySc5HNLSJ3Nw6rDh89p3RpRDPY'
 bot = telebot.TeleBot(TOKEN)
 target_face = None
 
-# إعداد محرك تحليل الوجوه (استخدام CPU ليتناسب مع خطة Render المجانية)
+# إعداد محرك تحليل الوجوه (CPU Only)
 face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
 face_app.prepare(ctx_id=0, det_size=(640, 640))
 المبادلة = insightface.model_zoo.get_model('inswapper_128.onnx', download=False)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "مرحباً بك في نظام SUKUNA.\n1. أرسل صورة الوجه (Target).\n2. ثم أرسل الصورة أو الفيديو المراد تبديله.")
+    bot.reply_to(message, "نظام SUKUNA جاهز.\n1. أرسل صورة الوجه الهدف.\n2. ثم أرسل الصورة أو الفيديو للتنفيذ.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
     global target_face
-    bot.reply_to(message, "جاري معالجة الصورة...")
+    bot.reply_to(message, "جاري المعالجة...")
     try:
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded = bot.download_file(file_info.file_path)
@@ -58,9 +58,9 @@ def handle_photo(message):
         if not target_face:
             if faces:
                 target_face = faces[0]
-                bot.reply_to(message, "✅ تم حفظ الوجه الهدف. الآن أرسل المادة المراد تنفيذ التبديل عليها.")
+                bot.reply_to(message, "✅ تم حفظ الوجه بنجاح.")
             else:
-                bot.reply_to(message, "❌ لم يتم العثور على وجه واضح.")
+                bot.reply_to(message, "❌ لم أجد وجهاً واضحاً.")
         else:
             res = img.copy()
             for face in faces:
@@ -77,7 +77,7 @@ def handle_video(message):
         bot.reply_to(message, "⚠️ أرسل صورة الوجه أولاً!")
         return
     
-    bot.reply_to(message, "⚙️ جاري معالجة الفيديو... قد يستغرق وقتاً طويلاً.")
+    bot.reply_to(message, "⚙️ جاري معالجة الفيديو... انتظر قليلاً.")
     try:
         file_info = bot.get_file(message.video.file_id)
         downloaded = bot.download_file(file_info.file_path)
@@ -103,12 +103,11 @@ def handle_video(message):
         new_video.write_videofile("out.mp4", codec="libx264", audio_codec="aac", logger=None)
         
         with open("out.mp4", "rb") as v:
-            bot.send_video(message.chat.id, v, caption="✅ تم تبديل الفيديو بنجاح.")
-            
+            bot.send_video(message.chat.id, v, caption="✅ تم بنجاح.")
     except Exception as e:
         bot.reply_to(message, f"❌ فشل المعالجة: {e}")
 
 if __name__ == "__main__":
     keep_alive() 
-    print("البوت شغال الآن...")
+    print("SUKUNA IS STARTING...")
     bot.polling(none_stop=True)
