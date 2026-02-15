@@ -3,4 +3,3 @@ insightface
 onnxruntime
 opencv-python-headless
 flask
-moviepy
